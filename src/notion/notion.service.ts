@@ -106,6 +106,52 @@ export class NotionService {
   // ─────────────────────────────────────────
 
   /**
+   * Split text into chunks of max 2000 characters (Notion API limit per text block)
+   * Preserves text structure by splitting on line breaks when possible
+   */
+  private splitTextIntoChunks(text: string, maxLength: number = 2000): string[] {
+    if (text.length <= maxLength) {
+      return [text];
+    }
+
+    const chunks: string[] = [];
+    let currentChunk = '';
+
+    // Split by lines first
+    const lines = text.split('\n');
+
+    for (const line of lines) {
+      // If adding this line exceeds max length, save current chunk and start new one
+      if ((currentChunk + line + '\n').length > maxLength) {
+        if (currentChunk) {
+          chunks.push(currentChunk.trim());
+          currentChunk = '';
+        }
+
+        // If single line is too long, split it further
+        if (line.length > maxLength) {
+          let remainingLine = line;
+          while (remainingLine.length > maxLength) {
+            chunks.push(remainingLine.substring(0, maxLength));
+            remainingLine = remainingLine.substring(maxLength);
+          }
+          currentChunk = remainingLine + '\n';
+        } else {
+          currentChunk = line + '\n';
+        }
+      } else {
+        currentChunk += line + '\n';
+      }
+    }
+
+    if (currentChunk.trim()) {
+      chunks.push(currentChunk.trim());
+    }
+
+    return chunks;
+  }
+
+  /**
    * create_page: creates a new Notion page under a parent page.
    *
    * REQUIRED metadata:
@@ -128,6 +174,9 @@ export class NotionService {
    *
    *   Currently we only support emoji icons. Additional icon types can be implemented
    *   by modifying the payload construction logic and updating the metadata schema.
+   *
+   * Note: Messages are automatically split into paragraphs if they exceed 2000 characters
+   * (Notion API text content limit). Each paragraph is created as a separate block.
    */
   private async createPage(dto: SendNotionDto): Promise<string> {
     const meta = dto.metadata ?? {};
@@ -140,6 +189,19 @@ export class NotionService {
     const title = (meta['title'] as string | undefined) ?? dto.message;
     const icon = meta['icon'] as string | undefined;
 
+    // Split message into chunks respecting Notion's 2000 char limit
+    const messageChunks = this.splitTextIntoChunks(dto.message);
+
+    // Build children blocks (one paragraph per chunk)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const children: any[] = messageChunks.map((chunk) => ({
+      object: 'block',
+      type: 'paragraph',
+      paragraph: {
+        rich_text: [{ type: 'text', text: { content: chunk } }],
+      },
+    }));
+
     // Build the request payload dynamically
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const createPayload: any = {
@@ -149,15 +211,7 @@ export class NotionService {
           title: [{ type: 'text', text: { content: title } }],
         },
       },
-      children: [
-        {
-          object: 'block',
-          type: 'paragraph',
-          paragraph: {
-            rich_text: [{ type: 'text', text: { content: dto.message } }],
-          },
-        },
-      ],
+      children,
     };
 
     // Only include icon if user provided one
