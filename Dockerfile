@@ -9,7 +9,8 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install --frozen-lockfile
 
-COPY entrypoint.sh ./`nCOPY . .
+COPY entrypoint.sh ./
+COPY . .
 
 RUN pnpm prisma:generate
 RUN pnpm build
