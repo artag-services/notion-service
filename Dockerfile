@@ -19,6 +19,6 @@ RUN pnpm build
 
 EXPOSE 3003
 
-ENTRYPOINT ["/app/entrypoint.sh"]
+ENTRYPOINT ["bash", "/app/entrypoint.sh"]
 CMD ["node", "dist/main"]
 
