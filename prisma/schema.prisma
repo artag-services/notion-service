@@ -8,6 +8,31 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model NotionOperation {
+  id          String              @id @default(uuid())
+  messageId   String              @unique
+  operation   String
+  body        String
+  metadata    Json?
+  status      NotionOpStatus      @default(PENDING)
+  notionId    String?
+  errorReason String?
+  executedAt  DateTime?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+enum NotionOpStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
 // ─── Pre-existing tables (never drop) ────────────────────────────────────────
 
 model days_off {
