@@ -1,4 +1,13 @@
--- CreateNotionOperation
+-- Notion Service Schema Migration
+
+-- CreateEnum: NotionOpStatus
+DO $$ BEGIN
+    CREATE TYPE "NotionOpStatus" AS ENUM ('PENDING', 'SUCCESS', 'FAILED');
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
+
+-- CreateTable: NotionOperation
 CREATE TABLE "NotionOperation" (
     "id" TEXT NOT NULL,
     "messageId" TEXT NOT NULL,
@@ -17,9 +26,8 @@ CREATE TABLE "NotionOperation" (
 -- CreateIndex: NotionOperation.messageId
 CREATE UNIQUE INDEX "NotionOperation_messageId_key" ON "NotionOperation" ("messageId");
 
--- CreateEnum: NotionOpStatus
-DO $$ BEGIN
-    CREATE TYPE "NotionOpStatus" AS ENUM ('PENDING', 'SUCCESS', 'FAILED');
-EXCEPTION
-    WHEN duplicate_object THEN null;
-END $$;
+-- CreateIndex: NotionOperation.status
+CREATE INDEX "NotionOperation_status_idx" ON "NotionOperation" ("status");
+
+-- CreateIndex: NotionOperation.createdAt
+CREATE INDEX "NotionOperation_createdAt_idx" ON "NotionOperation" ("createdAt");
