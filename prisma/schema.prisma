@@ -8,29 +8,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── Pre-existing tables (never drop) ────────────────────────────────────────
-
-model days_off {
-  id            Int     @id @default(autoincrement())
-  email         String?
-  vacation_days Int?    @db.SmallInt
-  sick_days     Int?    @db.SmallInt
-}
-
-model inventory {
-  id           Int     @id @default(autoincrement())
-  product_name String?
-  size         String?
-  in_stock     Int?
-}
-
-model n8n_vectors {
-  id        String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  text      String?
-  metadata  Json?
-  embedding Unsupported("vector")?
-}
-
 // ─── Notion Service ───────────────────────────────────────────────────────────
 
 model NotionOperation {
