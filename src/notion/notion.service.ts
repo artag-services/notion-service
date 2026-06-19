@@ -34,6 +34,8 @@ export class NotionService {
   // ─────────────── entry point ───────────────
 
   async execute(dto: SendNotionDto): Promise<NotionResponseDto> {
+    this.logger.log(`execute: operation=${dto.operation} messageId=${dto.messageId} hasScrapedData=${!!(dto.metadata as any)?.scrapedData}`)
+
     // Idempotency: if we already have this messageId in SUCCESS, return it as-is.
     const existing = await this.prisma.notionOperation.findUnique({
       where: { messageId: dto.messageId },
@@ -128,6 +130,10 @@ export class NotionService {
     if (scrapedData) {
       title = (scrapedData['title'] as string) || (meta['title'] as string) || dto.message
       children = this.buildScrapedBlocks(scrapedData, meta)
+      const sections = (scrapedData['sections'] as any)?.length ?? 0
+      const links = (scrapedData['links'] as any)?.length ?? 0
+      const textLen = (scrapedData['text'] as string)?.length ?? 0
+      this.logger.log(`createPage: scrapedData mode — title="${title}" sections=${sections} links=${links} textLen=${textLen} blocks=${children.length}`)
     } else {
       title = (meta['title'] as string | undefined) ?? dto.message
       const messageChunks = this.splitTextIntoChunks(dto.message)
@@ -136,6 +142,7 @@ export class NotionService {
         type: 'paragraph',
         paragraph: { rich_text: [{ type: 'text', text: { content: chunk } }] },
       }))
+      this.logger.log(`createPage: legacy mode — title="${title}" chunks=${children.length}`)
     }
 
     const payload: Record<string, unknown> = {
@@ -148,6 +155,7 @@ export class NotionService {
     const response = await this.notion.withRetry('createPage', () =>
       this.notion.sdk.pages.create(payload as Parameters<typeof this.notion.sdk.pages.create>[0]),
     )
+    this.logger.log(`createPage: Notion API returned id=${response.id}`)
     return response.id
   }
 

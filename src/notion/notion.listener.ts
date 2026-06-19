@@ -15,9 +15,14 @@ export class NotionListener implements OnModuleInit {
   ) {}
 
   async onModuleInit(): Promise<void> {
-    await this.rabbitmq.subscribe(QUEUES.NOTION_SEND, ROUTING_KEYS.NOTION_SEND, (payload) =>
-      this.handleOperation(payload),
-    )
+    try {
+      await this.rabbitmq.subscribe(QUEUES.NOTION_SEND, ROUTING_KEYS.NOTION_SEND, (payload) =>
+        this.handleOperation(payload),
+      )
+      this.logger.log('NotionListener ready — listening on notion.send queue')
+    } catch (err) {
+      this.logger.error(`Failed to subscribe to notion.send: ${(err as Error).message}`)
+    }
   }
 
   private async handleOperation(payload: Record<string, unknown>): Promise<void> {
