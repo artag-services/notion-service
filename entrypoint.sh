@@ -51,36 +51,23 @@ echo -e "${GREEN}✅ PostgreSQL is ready!${NC}"
 echo -e "\n${YELLOW}[STEP 2/3]${NC} Generating Prisma Client..."
 
 if [ -f "prisma/schema.prisma" ]; then
-  pnpm prisma:generate 2>&1 | sed 's/^/  /'
-  echo -e "${GREEN}✅ Prisma Client generated successfully!${NC}"
+  if pnpm prisma:generate 2>&1; then
+    echo -e "${GREEN}✅ Prisma Client generated successfully!${NC}"
+  else
+    echo -e "${RED}❌ Prisma Client generation failed!${NC}"
+    exit 1
+  fi
 else
   echo -e "${BLUE}ℹ️  No Prisma schema found (stateless service)${NC}"
 fi
 
 # ─────────────────────────────────────────────────────────────────
-# STEP 3: Clean Migration History (for fresh schema application)
+# STEP 3: Run Database Schema Sync (prisma db push)
 # ─────────────────────────────────────────────────────────────────
-echo -e "\n${YELLOW}[STEP 3a/3]${NC} Cleaning up migration history..."
+echo -e "\n${YELLOW}[STEP 3/3]${NC} Syncing database schema (prisma db push)..."
 
 if [ -f "prisma/schema.prisma" ]; then
-  # Extract database URL to get DB name
-  DB_URL="${NOTION_DATABASE_URL:-${DATABASE_URL}}"
-  if [ -n "$DB_URL" ]; then
-    # Clean migration history to allow fresh schema application
-    psql "$DB_URL" -c "DELETE FROM _prisma_migrations;" 2>/dev/null || true
-    echo -e "${BLUE}  ℹ️  Migration history cleared (allows fresh schema application)${NC}"
-  fi
-else
-  echo -e "${BLUE}  ℹ️  No Prisma schema found (skipping migration cleanup)${NC}"
-fi
-
-# ─────────────────────────────────────────────────────────────────
-# STEP 4: Run Database Migrations
-# ─────────────────────────────────────────────────────────────────
-echo -e "\n${YELLOW}[STEP 3b/3]${NC} Syncing database schema (prisma db push)..."
-
-if [ -f "prisma/schema.prisma" ]; then
-  if pnpm prisma:push 2>&1 | sed 's/^/  /'; then
+  if pnpm prisma:push 2>&1; then
     echo -e "${GREEN}✅ Database schema is in sync with schema.prisma!${NC}"
   else
     echo -e "${RED}❌ CRITICAL: Database schema sync failed!${NC}"
