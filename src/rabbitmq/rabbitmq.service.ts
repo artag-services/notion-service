@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import * as amqp from 'amqplib';
 import { RABBITMQ_EXCHANGE } from './constants/queues';
 
+type ConnectionModel = Awaited<ReturnType<typeof amqp.connect>>;
+
 interface SubscriptionEntry {
   queue: string;
   routingKey: string;
@@ -12,7 +14,7 @@ interface SubscriptionEntry {
 @Injectable()
 export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(RabbitMQService.name);
-  private connection: amqp.Connection | null = null;
+  private connection: ConnectionModel | null = null;
   private channel: amqp.Channel | null = null;
   private readonly retryAttempts = 10;
   private readonly retryDelay = 3000;
@@ -70,13 +72,13 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
 
     try {
       this.logger.log(`Connecting to RabbitMQ at ${url}...`);
-      this.connection = await amqp.connect(url);
+      const conn = await amqp.connect(url);
 
-      this.connection.on('error', (err) => {
+      conn.on('error', (err) => {
         this.logger.error(`RabbitMQ connection error: ${err.message}`);
       });
 
-      this.connection.on('close', () => {
+      conn.on('close', () => {
         if (this.reconnecting) return;
         this.reconnecting = true;
         this.logger.warn('RabbitMQ connection closed — reconnecting...');
@@ -85,17 +87,20 @@ export class RabbitMQService implements OnModuleInit, OnModuleDestroy {
         this.consumerTags = [];
         this.connect()
           .then(() => this._replaySubscriptions())
-          .catch((e) => this.logger.error(`Reconnection failed: ${e.message}`))
+          .catch((e) => this.logger.error(`Reconnection failed: ${(e as Error).message}`))
           .finally(() => { this.reconnecting = false });
       });
 
-      this.channel = await this.connection.createChannel();
+      const ch = await conn.createChannel();
 
-      this.channel.on('error', (err) => {
+      ch.on('error', (err) => {
         this.logger.error(`RabbitMQ channel error: ${err.message}`);
       });
 
-      await this.channel.assertExchange(RABBITMQ_EXCHANGE, 'topic', { durable: true });
+      await ch.assertExchange(RABBITMQ_EXCHANGE, 'topic', { durable: true });
+
+      this.connection = conn;
+      this.channel = ch;
       this.logger.log('Connected to RabbitMQ successfully');
     } catch (error) {
       if (retries > 0) {
