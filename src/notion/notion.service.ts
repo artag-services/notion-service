@@ -119,15 +119,24 @@ export class NotionService {
       throw new BadRequestException('metadata.parent_page_id is required for create_page')
     }
 
-    const title = (meta['title'] as string | undefined) ?? dto.message
     const icon = meta['icon'] as string | undefined
-    const messageChunks = this.splitTextIntoChunks(dto.message)
+    const scrapedData = meta['scrapedData'] as Record<string, unknown> | undefined
 
-    const children = messageChunks.map((chunk) => ({
-      object: 'block',
-      type: 'paragraph',
-      paragraph: { rich_text: [{ type: 'text', text: { content: chunk } }] },
-    }))
+    let title: string
+    let children: Record<string, unknown>[]
+
+    if (scrapedData) {
+      title = (scrapedData['title'] as string) || (meta['title'] as string) || dto.message
+      children = this.buildScrapedBlocks(scrapedData, meta)
+    } else {
+      title = (meta['title'] as string | undefined) ?? dto.message
+      const messageChunks = this.splitTextIntoChunks(dto.message)
+      children = messageChunks.map((chunk) => ({
+        object: 'block',
+        type: 'paragraph',
+        paragraph: { rich_text: [{ type: 'text', text: { content: chunk } }] },
+      }))
+    }
 
     const payload: Record<string, unknown> = {
       parent: { page_id: parentPageId },
@@ -140,6 +149,72 @@ export class NotionService {
       this.notion.sdk.pages.create(payload as Parameters<typeof this.notion.sdk.pages.create>[0]),
     )
     return response.id
+  }
+
+  private buildScrapedBlocks(
+    scrapedData: Record<string, unknown>,
+    meta: Record<string, unknown>,
+  ): Record<string, unknown>[] {
+    const blocks: Record<string, unknown>[] = []
+
+    const url = meta['url'] as string | undefined
+
+    if (url) {
+      blocks.push({
+        object: 'block',
+        type: 'paragraph',
+        paragraph: {
+          rich_text: [
+            { type: 'text', text: { content: `📄 ` } },
+            { type: 'text', text: { content: 'Scraped from: ', bold: true } },
+            { type: 'text', text: { content: url, link: { url } } },
+          ],
+        },
+      })
+    }
+
+    const sections = (scrapedData['sections'] as string[]) ?? []
+    for (const section of sections) {
+      if (section.trim()) {
+        blocks.push({
+          object: 'block',
+          type: 'heading_2',
+          heading_2: { rich_text: [{ type: 'text', text: { content: section } }] },
+        })
+      }
+    }
+
+    const links = (scrapedData['links'] as Array<{ href: string; text: string }>) ?? []
+    for (const link of links) {
+      if (link.href && link.text) {
+        blocks.push({
+          object: 'block',
+          type: 'bulleted_list_item',
+          bulleted_list_item: {
+            rich_text: [
+              {
+                type: 'text',
+                text: { content: link.text, link: { url: link.href } },
+              },
+            ],
+          },
+        })
+      }
+    }
+
+    const text = (scrapedData['text'] as string) ?? ''
+    if (text) {
+      const chunks = this.splitTextIntoChunks(text)
+      for (const chunk of chunks) {
+        blocks.push({
+          object: 'block',
+          type: 'paragraph',
+          paragraph: { rich_text: [{ type: 'text', text: { content: chunk } }] },
+        })
+      }
+    }
+
+    return blocks
   }
 
   private async createTask(dto: SendNotionDto): Promise<string> {
