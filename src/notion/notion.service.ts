@@ -167,7 +167,7 @@ export class NotionService {
 
     const url = meta['url'] as string | undefined
 
-    if (url) {
+    if (url && this.isValidUrl(url)) {
       blocks.push({
         object: 'block',
         type: 'paragraph',
@@ -192,9 +192,9 @@ export class NotionService {
       }
     }
 
-    const links = (scrapedData['links'] as Array<{ href: string; text: string }>) ?? []
-    for (const link of links) {
-      if (link.href && link.text) {
+    const rawLinks = (scrapedData['links'] as Array<{ href: string; text: string }>) ?? []
+    for (const link of rawLinks) {
+      if (link.href && link.text && this.isValidUrl(link.href)) {
         blocks.push({
           object: 'block',
           type: 'bulleted_list_item',
@@ -267,6 +267,15 @@ export class NotionService {
       'invite_member is not supported via Notion integration tokens. ' +
         'Use Notion OAuth (user-scoped tokens) or invite via the Notion UI/Admin API instead.',
     )
+  }
+
+  private isValidUrl(url: string): boolean {
+    try {
+      const parsed = new URL(url)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch {
+      return false
+    }
   }
 
   // ─────────────── helpers ───────────────
