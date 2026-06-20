@@ -174,7 +174,7 @@ export class NotionService {
         paragraph: {
           rich_text: [
             { type: 'text', text: { content: `📄 ` } },
-            { type: 'text', text: { content: 'Scraped from: ', bold: true } },
+            { type: 'text', text: { content: 'Scraped from: ' }, annotations: { bold: true } },
             { type: 'text', text: { content: url, link: { url } } },
           ],
         },
